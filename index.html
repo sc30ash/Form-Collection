@@ -1,0 +1,176 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Leaflet and Google Form GPS Data Collection</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta property="og:title" content="Leaflet and Google Form GPS Data Collection" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://aogdp.github.io/gpsform/" />
+  <meta property="og:image" content="https://raw.githubusercontent.com/aogdp/gpsform/gh-pages/img/gpsform.png" />
+  <meta property="og:description" content="A web app that uses Google Forms and Leaflet to collect data using a web browser." />
+  <!--Bootstrap for form-->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" />
+  <!--leaflet-->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/leaflet.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/leaflet.js"></script>
+  <!--Location Plugin-->
+  <script src='https://cdn.jsdelivr.net/leaflet.locatecontrol/0.49.0/L.Control.Locate.min.js'></script>
+  <link href='https://cdn.jsdelivr.net/leaflet.locatecontrol/0.49.0/L.Control.Locate.css' rel='stylesheet' />
+  <!--Tabletop and GeoJson-->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tabletop.js/1.4.3/tabletop.min.js"></script>
+  <script src="js/geojson.js"></script>
+  <!--Fonts-->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.6.1/css/font-awesome.min.css">
+  <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,700,900' rel='stylesheet' type='text/css'>
+
+  <script   src="https://code.jquery.com/jquery-2.2.3.min.js"   integrity="sha256-a23g1Nt4dtEYOj7bR+vTu7+T8VP13humZFBJNIYoEJo="   crossorigin="anonymous"></script>
+  <style>
+    *{font-family: 'Source Sans Pro', sans-serif;}
+    .map {height:70%}
+    #map {position:relative;height:500px;}
+    .leaflet-popup-content {font-size: medium;}
+    .form-group{width:250px;margin-bottom:0;}
+    .form-control{resize:none;}
+    .text-muted{font-size:smaller;}
+    hr {margin: 10px 0;}
+  </style>
+</head>
+
+<body>
+  <div class="container text-center">
+    <h3>Leaflet GPS Collection using Google Forms</h3>
+  </div>
+  <div class="map">
+    <div id="map"></div>
+  </div>
+  <div class="container">
+    <h4>This is a simple web app that uses Leaflet and Google Forms, along with a few plugins, to collect data using just a modern web browser.</h4>
+    <h4>Check out the simple <a href="https://github.com/aogdp/gpsform/blob/gh-pages/README.md">instructions</a> to learn how to create your own collection app.</h4>
+  </div>
+  <script>
+    var map = L.map('map'); //Initialize the map
+
+    var formId = '1W7VT7zb-FqXMKHQOaTOk98962JgUoj6wenKHJj6wveI';
+    var formLat = '901859115';
+    var formLng = '409223055';
+    var formText = '1462809152';
+    var gsheet = '1sJ--Hs6j3TQH1Ofwjhy1C4bRsdFxK7WaUIkyCbA7OY8';
+
+    //Add a basemap
+    var OpenStreetMap_Mapnik = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    	maxZoom: 19,
+    	attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    //Add Location Options - override the plugin default popup and circle
+    var locOptions = {
+      drawCircle: false,
+      showPopup: false,
+      follow:true,
+    };
+
+    //Add Location
+    var loc = L.control.locate(locOptions).addTo(map);
+
+    //Endable Location at page load and do things once the location is found
+    loc.start();
+
+    var marker, circle, lat, lng; //create variables used throughout the map
+
+    function collectData(e) {
+      //console.log(e);
+      lat = e.latlng.lat;
+      lng = e.latlng.lng;
+
+      var form = '<div id="formdiv"><form role="form" id="projectform"><div class="form-group"><div class="form-group"><label for="description" class="requiredField">GPS Collection Form</label><textarea class="form-control" rows="3" id="descrip" placeholder="Text input..."></textarea></div><em class="text-muted">Click submit to add a point at this location.</em><div id="formHelp"></div><hr /><button type="submit" id="submit" class="btn btn-default btn-sm">Submit</button></form></div>';
+
+      if (e.accuracy) {
+        var radius = (e.accuracy / 2) * 3.28084;
+        circle = L.circle(e.latlng, radius).addTo(map);
+      }
+      marker = L.marker(e.latlng).addTo(map)
+      .bindPopup(form, {maxWidth:400});
+      
+      //if you try and open the popup right away the location may not be ready, eventhough it's firing after locationfound
+      setTimeout(function() {
+        marker.openPopup();
+        loc.stop();
+      }, 100);
+
+      marker.on('popupopen', function() {
+        $('#projectform').submit(function(event) {
+            event.preventDefault();
+            var descrip = $('#descrip').val();
+            //console.log(descrip);
+            if (descrip) {
+              //console.log(descrip);
+              $('#formdiv').html('<iframe src="https://docs.google.com/forms/d/' + formId + '/formResponse?entry.' + formLat + '=' + lat + '&entry.' + formLng + '=' + lng + '&entry.'+ formText + '=' + descrip + '&submit=Submit" seamless scrolling="no" style="overflow:hidden;height:375px;border:lightgray solid thin;"></iframe>');
+            } else {
+              $('#formHelp').html('<span style="color:red;">Please enter a description of your point.</span>')
+            }
+          });
+      });
+      if (marker) {
+        marker.on('popupclose', function() {
+          map.removeLayer(marker);
+          if (map.hasLayer(circle)) {
+            map.removeLayer(circle);
+          }
+        });
+      }
+    }
+
+
+    map.on('locationfound', function(e) {
+      collectData(e);
+    });
+    
+  setTimeout(function() {
+    if(lat) {
+      return false;
+    }else{
+      console.log('no loc');
+      loc.stop();
+      map.setView([39,-82], 10);
+      alert('No location found')
+    }
+    }, 6000);
+
+    map.on('click', function(e) {
+      collectData(e);
+    });
+
+/*    map.on('stopfollowing', function() {
+      if (marker) { 
+        marker.closePopup();
+      }
+    });*/
+
+    //Add form response points
+    //Add an empty geojson layer for the google sheet points and create the popup
+    var gps = new L.geoJson(null, {
+      onEachFeature: function(feature, layer) {
+        layer.bindPopup(feature.properties.Description)
+      }
+    });
+
+    //Grab the google sheet data using tabletop - published to the web not just shared - and use geojson.min.js to convert into proper geojson format
+    var tabletop = Tabletop.init( {
+      key: gsheet,
+      simpleSheet: true,
+      parseNumbers: true,
+      callback: function(data, tabletop) {
+        var gpsData = GeoJSON.parse(data, {Point: ['Latitude', 'Longitude']});
+
+        //add that data to the geojson layer created earlier
+        gps.addData(gpsData);
+        gps.addTo(map);
+      },
+    });
+
+  </script>
+</body>
+
+</html>
